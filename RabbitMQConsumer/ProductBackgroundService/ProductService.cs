@@ -29,29 +29,18 @@ namespace RabbitMQConsumer.ProductBackgroundService
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
-                var factory = new ConnectionFactory
+            var factory = new ConnectionFactory();
+            factory.Uri = new Uri("amqps://eznbdupx:Qf4h0Avxf0yEipy5VaR1D7UHRfIL0Gfn@gerbil.rmq.cloudamqp.com/eznbdupx");
+            using var connection = factory.CreateConnection();
+            var channel = connection.CreateModel();
+            var consumer = new EventingBasicConsumer(channel);
+            channel.BasicConsume("product", false, consumer);
+         
+                consumer.Received += (object sender , BasicDeliverEventArgs e) =>
                 {
-                    HostName = "localhost"
-                };
-           
-                var connection = factory.CreateConnection();
-                using var channel = connection.CreateModel();
-                channel.BasicQos(0, 1, false);
-                  
-                var consumer = new EventingBasicConsumer(channel);
-            try
-            {
-
-                consumer.Received += (model, e) =>
-                {
-
-                        Task.Delay(10000).Wait();
-
-                        var body = e.Body;
-                        var message = System.Text.Encoding.UTF8.GetString(body.ToArray());
+                        var message = System.Text.Encoding.UTF8.GetString(e.Body.ToArray());
                         var product = System.Text.Json.JsonSerializer.Deserialize<Product>(message);
-                        _logger.LogInformation("Mesajımız : " + product.ProductName);
-                        Console.Write($"{product.ProductName}");
+                   
                         Product productEntity = new Product
                         {
                             ProductName = product.ProductName,
@@ -61,16 +50,13 @@ namespace RabbitMQConsumer.ProductBackgroundService
                         };
                         _context.Products.AddAsync(productEntity);
                         _context.SaveChangesAsync();
-
+                        channel.BasicAck(e.DeliveryTag, false);
                 };
-                channel.BasicConsume("product", false, consumer);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex.Message);
-            }
+            Console.WriteLine("İşlem başarılı");
+            //Solution is here
+            Console.ReadKey();
             return Task.CompletedTask;
         }
     }
-    }
+}
 
